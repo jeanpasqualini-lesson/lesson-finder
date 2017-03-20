@@ -91,7 +91,7 @@ class MainTest implements TestInterface {
     {
         $finder = $this->getFinder();
 
-        $finder->in("/etc/php5")->exclude("/etc/php5/mods-available/");
+        $finder->in("/etc/cron.daily")->exclude("dsq");
 
         $this->dumpFinder($finder);
     }
@@ -161,7 +161,6 @@ class MainTest implements TestInterface {
     public function testOther()
     {
         $finder = $this->getFinder();
-
         $finder->in(ROOT_DIR.DIRECTORY_SEPARATOR."..".DIRECTORY_SEPARATOR."vendor");
 
         $finder->files()
@@ -171,7 +170,7 @@ class MainTest implements TestInterface {
             ->contains("Test")
             ->path("Tests/")
             ->notPath("Iterator")
-            ->depth(" > 3")
+            //->depth(" > 3")
         ;
 
         $finder->filter(function(\SplFileInfo $file)
@@ -182,7 +181,9 @@ class MainTest implements TestInterface {
             }
         });
 
-        echo "first : ".end(iterator_to_array($finder))->getContents().PHP_EOL;
+        $files = iterator_to_array($finder);
+
+        echo "first : ".end($files)->getContents().PHP_EOL;
 
         $this->dumpFinder($finder);
     }
