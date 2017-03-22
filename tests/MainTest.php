@@ -1,5 +1,4 @@
 <?php
-
 namespace tests;
 
 use org\bovigo\vfs\vfsStream;
