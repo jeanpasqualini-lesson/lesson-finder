@@ -388,4 +388,54 @@ class MainTest extends \PHPUnit_Framework_TestCase
 
         $this->assertEquals($expected, $files);
     }
+
+    public function testExclude()
+    {
+        $folderA = vfsStream::newDirectory('folderA')->at($this->vfs);
+        $folderB = vfsStream::newDirectory('folderB')->at($this->vfs);
+        vfsStream::newFile('file.txt')->at($folderA);
+        vfsStream::newFile('file.txt')->at($folderB);
+
+        $this->finder->files();
+        $this->finder->in($this->vfs->url());
+        $this->finder->exclude('folderA');
+
+        $files = array_keys(iterator_to_array($this->finder));
+
+        $this->assertEquals([
+            'vfs://root/folderB/file.txt'
+        ], $files);
+    }
+
+    public function testIgnoreDotFiles()
+    {
+        // By default is true
+        $this->finder->in($this->vfs->url());
+        $this->finder->ignoreDotFiles(false);
+
+        vfsStream::newFile('.htaccess')->at($this->vfs);
+
+        $files = array_keys(iterator_to_array($this->finder));
+
+        $this->assertEquals([
+            'vfs://root/.htaccess'
+        ], $files);
+    }
+
+    public function testIgnoreVCS()
+    {
+        // By default is true
+        $this->finder->in($this->vfs->url());
+        $this->finder->ignoreVCS(false);
+        $this->finder->ignoreDotFiles(false);
+        $this->finder->directories();
+
+        vfsStream::newDirectory('.git')->at($this->vfs);
+
+        $directories = array_keys(iterator_to_array($this->finder));
+
+        $this->assertEquals([
+            'vfs://root/.git'
+        ], $directories);
+    }
 }
