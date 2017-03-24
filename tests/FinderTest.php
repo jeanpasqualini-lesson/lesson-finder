@@ -3,10 +3,11 @@ namespace tests;
 
 use org\bovigo\vfs\content\LargeFileContent;
 use org\bovigo\vfs\vfsStream;
+use Symfony\Component\Finder\Exception\AccessDeniedException;
 use Symfony\Component\Finder\Finder;
 use org\bovigo\vfs\vfsStreamDirectory;
 
-class MainTest extends \PHPUnit_Framework_TestCase
+class FinderTest extends \PHPUnit_Framework_TestCase
 {
     /** @var Finder */
     private $finder;
@@ -437,5 +438,205 @@ class MainTest extends \PHPUnit_Framework_TestCase
         $this->assertEquals([
             'vfs://root/.git'
         ], $directories);
+    }
+
+    public function testAddVCSPattern()
+    {
+        // Equivalent of exclude
+        // Tip : exclude is only for directories and not support pattern or glob
+        $this->finder->in($this->vfs->url());
+
+        vfsStream::newDirectory('darkvador')->at($this->vfs);
+        vfsStream::newDirectory('luke_skywalker')->at($this->vfs);
+
+        Finder::addVCSPattern('darkvador');
+        $files = array_keys(iterator_to_array($this->finder));
+
+        $this->assertEquals([
+            'vfs://root/luke_skywalker'
+        ], $files);
+    }
+
+    public function testSort()
+    {
+        $this->finder->in($this->vfs->url());
+        $this->finder->sort(function(\SplFileInfo $left, \SplFileInfo $right) {
+            return strcmp($left->getFilename(), $right->getFilename());
+        });
+
+        vfsStream::newFile('AB.txt')->at($this->vfs);
+        vfsStream::newFile('B.txt')->at($this->vfs);
+        vfsStream::newFile('C.txt')->at($this->vfs);
+        vfsStream::newFile('A.txt')->at($this->vfs);
+
+        $files = array_keys(iterator_to_array($this->finder));
+
+        $this->assertEquals([
+            'vfs://root/A.txt',
+            'vfs://root/AB.txt',
+            'vfs://root/B.txt',
+            'vfs://root/C.txt',
+        ], $files);
+    }
+
+    public function testSortByName()
+    {
+        $this->finder->in($this->vfs->url());
+        $this->finder->sortByName();
+
+        vfsStream::newFile('AB.txt')->at($this->vfs);
+        vfsStream::newFile('B.txt')->at($this->vfs);
+        vfsStream::newFile('C.txt')->at($this->vfs);
+        vfsStream::newFile('A.txt')->at($this->vfs);
+
+        $files = array_keys(iterator_to_array($this->finder));
+
+        $this->assertEquals([
+            'vfs://root/A.txt',
+            'vfs://root/AB.txt',
+            'vfs://root/B.txt',
+            'vfs://root/C.txt',
+        ], $files);
+    }
+
+    public function testSortByType()
+    {
+        // Sort by type (1. Folder 2. Files) and by name
+        $this->finder->in($this->vfs->url());
+        $this->finder->sortByType();
+
+        vfsStream::newFile('AB.txt')->at($this->vfs);
+        vfsStream::newDirectory('folderC')->at($this->vfs);
+        vfsStream::newFile('B.txt')->at($this->vfs);
+        vfsStream::newDirectory('folderA')->at($this->vfs);
+        vfsStream::newFile('C.txt')->at($this->vfs);
+        vfsStream::newDirectory('folderB')->at($this->vfs);
+        vfsStream::newFile('A.txt')->at($this->vfs);
+
+        $files = array_keys(iterator_to_array($this->finder));
+
+        $this->assertEquals([
+            'vfs://root/folderA',
+            'vfs://root/folderB',
+            'vfs://root/folderC',
+            'vfs://root/A.txt',
+            'vfs://root/AB.txt',
+            'vfs://root/B.txt',
+            'vfs://root/C.txt',
+        ], $files);
+    }
+
+    public function testSortByAccessedTime()
+    {
+        $this->finder->in($this->vfs->url());
+        $this->finder->sortByAccessedTime();
+
+        vfsStream::newFile('two.txt')->lastAccessed(strtotime('2017-01-01'))->at($this->vfs);
+        vfsStream::newFile('three.txt')->lastAccessed(strtotime('2018-01-01'))->at($this->vfs);
+        vfsStream::newFile('first.txt')->lastAccessed(strtotime('2016-01-01'))->at($this->vfs);
+
+        $files = array_keys(iterator_to_array($this->finder));
+
+        $this->assertEquals([
+            'vfs://root/first.txt',
+            'vfs://root/two.txt',
+            'vfs://root/three.txt',
+        ], $files);
+    }
+
+    public function testSortByChangedTime()
+    {
+        // Inode is not supported by vfs
+        $this->markTestSkipped('the inode is not supported by vfs');
+    }
+
+    public function testSortByModifiedTime()
+    {
+        $this->finder->in($this->vfs->url());
+        $this->finder->sortByModifiedTime();
+
+        vfsStream::newFile('two.txt')->lastModified(strtotime('2017-01-01'))->at($this->vfs);
+        vfsStream::newFile('three.txt')->lastModified(strtotime('2018-01-01'))->at($this->vfs);
+        vfsStream::newFile('first.txt')->lastModified(strtotime('2016-01-01'))->at($this->vfs);
+
+        $files = array_keys(iterator_to_array($this->finder));
+
+        $this->assertEquals([
+            'vfs://root/first.txt',
+            'vfs://root/two.txt',
+            'vfs://root/three.txt',
+        ], $files);
+    }
+
+    public function testFilter()
+    {
+        $this->finder->in($this->vfs->url());
+        $this->finder->filter(function(\SplFileInfo $fileInfo) {
+           return strpos($fileInfo->getFilename(), 'color_');
+        });
+
+        vfsStream::newFile('color_dark.txt')->at($this->vfs);
+        vfsStream::newFile('color_white.txt')->at($this->vfs);
+        vfsStream::newFile('car_red.txt')->at($this->vfs);
+
+        $files = array_keys(iterator_to_array($this->finder));
+
+        $this->assertEquals([
+            'vfs://root/color_dark.txt',
+            'vfs://root/color_white.txt',
+        ], $files);
+    }
+
+    public function testFollowSymlink()
+    {
+        $this->markTestSkipped('the symlink is not supported by vfs');
+    }
+
+    public function testIgnoreUnreadeableDirsWithFalse()
+    {
+        $this->setExpectedException(AccessDeniedException::class);
+        $this->finder->in($this->vfs->url());
+        $this->finder->directories();
+
+        vfsStream::newDirectory('admin')->chmod(0600)->chown(1)->at($this->vfs);
+
+        iterator_to_array($this->finder);
+    }
+
+    public function testIgnoreUnreadeableDirsWithTrue()
+    {
+        $this->finder->in($this->vfs->url());
+        $this->finder->directories();
+        $this->finder->ignoreUnreadableDirs();
+
+        vfsStream::newDirectory('admin')->chmod(0600)->chown(1)->at($this->vfs);
+
+        $files = array_keys(iterator_to_array($this->finder));
+
+        $this->assertEquals([
+            'vfs://root/admin'
+        ], $files);
+    }
+
+    public function testCount()
+    {
+        $this->finder->in($this->vfs->url());
+
+        vfsStream::newFile('color_dark.txt')->at($this->vfs);
+        vfsStream::newFile('color_white.txt')->at($this->vfs);
+        vfsStream::newFile('car_red.txt')->at($this->vfs);
+
+        $files = array_keys(iterator_to_array($this->finder));
+
+        $this->assertCount(3, $files);
+    }
+
+    public function testAddIterator()
+    {
+        $this->finder->append(new \ArrayIterator(['A', 'B', 'C']));
+
+        $elements = iterator_to_array($this->finder);
+
+        $this->assertEquals(['A', 'B', 'C'], $elements);
     }
 }
